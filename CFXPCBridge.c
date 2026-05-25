@@ -32,7 +32,7 @@ CFTypeRef _CFXPCCreateCFObjectFromXPCObject(xpc_object_t xo) {
 
 	if (type == XPC_TYPE_DICTIONARY) {
 		size_t count = xpc_dictionary_get_count(xo);
-		CFStringRef* keys = malloc(count * sizeof(CFStringRef));
+		void** keys = malloc(count * sizeof(CFStringRef));
 		CFTypeRef* values = malloc(count * sizeof(CFTypeRef));
 		__block size_t idx = 0;
 

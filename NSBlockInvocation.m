@@ -46,7 +46,7 @@ id __NSMakeSpecialForwardingCaptureBlock(const char* signature, void (^proxyBloc
 	};
 	size_t signatureLength = strlen(signature);
 	struct Block_layout* dummy = (void*)dummyBlock;
-	struct Block_descriptor_full* dummyDescs = dummy->descriptor;
+	struct Block_descriptor_full* dummyDescs = (struct Block_descriptor_full*)dummy->descriptor;
 	struct NSProxyBlockFull* custom = calloc(sizeof(struct NSProxyBlockFull) + signatureLength + 1, 1);
 
 	custom->block.blockInternal.isa = _NSConcreteMallocBlock;
@@ -70,5 +70,5 @@ id __NSMakeSpecialForwardingCaptureBlock(const char* signature, void (^proxyBloc
 
 	custom->descs.desc2.copy(custom, dummy);
 
-	return custom;
+	return (id)custom;
 };
