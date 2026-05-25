@@ -40,6 +40,7 @@ struct NSProxyBlockFull {
 
 id __NSMakeSpecialForwardingCaptureBlock(const char* signature, void (^proxyBlock)(NSBlockInvocation*)) {
 	// dummy block we can use to borrow certain details we need for our custom block
+	// See https://clang.llvm.org/docs/Block-ABI-Apple.html for a better understanding
 	void (^dummyBlock)(void) = ^{
 		[proxyBlock self];
 	};
@@ -57,9 +58,11 @@ id __NSMakeSpecialForwardingCaptureBlock(const char* signature, void (^proxyBloc
 
 	custom->descs.desc1.size = sizeof(struct NSProxyBlock);
 
+	// TODO: Should we check for BLOCK_HAS_COPY_DISPOSE flag in dummyDescs?
 	custom->descs.desc2.copy = dummyDescs->desc2.copy;
 	custom->descs.desc2.dispose = dummyDescs->desc2.dispose;
 
+	// TODO: Should we check for BLOCK_HAS_SIGNATURE flag in dummyDescs?
 	custom->descs.desc3.signature = custom->signature;
 	custom->descs.desc3.layout = dummyDescs->desc3.layout;
 
