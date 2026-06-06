@@ -390,33 +390,33 @@ static BOOL isBlock(id object)
 
     for (NSInteger index = -1; index < (NSInteger) [_signature numberOfArguments]; index++)
     {
-        CFStringAppend(description, @"\n");
+        CFStringAppend(description, CFSTR("\n"));
 
         switch (index)
         {
         case -1:
-            CFStringAppend(description, @"return value");
+            CFStringAppend(description, CFSTR("return value"));
             break;
         case 0:
-            CFStringAppend(description, @"target");
+            CFStringAppend(description, CFSTR("target"));
             break;
         case 1:
-            CFStringAppend(description, @"selector");
+            CFStringAppend(description, CFSTR("selector"));
             break;
         default:
-            CFStringAppendFormat(description, NULL, @"argument %ld", (long) index);
+            CFStringAppendFormat(description, NULL, CFSTR("argument %ld"), (long) index);
             break;
         }
-        CFStringAppend(description, @": ");
+        CFStringAppend(description, CFSTR(": "));
 
         NSMethodType *argInfo = [_signature _argInfo: index + 1];
-        CFStringAppendFormat(description, NULL, @"{%s} ", argInfo->type);
+        CFStringAppendFormat(description, NULL, CFSTR("{%s} "), argInfo->type);
 
         char type = stripQualifiersAndComments(argInfo->type)[0];
         switch (type)
         {
         case _C_VOID:
-            CFStringAppend(description, @"void");
+            CFStringAppend(description, CFSTR("void"));
             break;
         case _C_CLASS:
             {
@@ -424,11 +424,11 @@ static BOOL isBlock(id object)
                 [self getArgument: &class atIndex: index];
                 if (class == Nil)
                 {
-                    CFStringAppend(description, @"Nil");
+                    CFStringAppend(description, CFSTR("Nil"));
                 }
                 else
                 {
-                    CFStringAppendFormat(description, NULL, @"%s", class_getName(class));
+                    CFStringAppendFormat(description, NULL, CFSTR("%s"), class_getName(class));
                 }
                 break;
             }
@@ -438,11 +438,11 @@ static BOOL isBlock(id object)
                 [self getArgument: &selector atIndex: index];
                 if (!selector)
                 {
-                    CFStringAppend(description, @"null");
+                    CFStringAppend(description, CFSTR("null"));
                 }
                 else
                 {
-                    CFStringAppendFormat(description, NULL, @"%s", sel_getName(selector));
+                    CFStringAppendFormat(description, NULL, CFSTR("%s"), sel_getName(selector));
                 }
                 break;
             }
@@ -456,22 +456,22 @@ static BOOL isBlock(id object)
                 break; \
             }
 
-        HANDLE(_C_CHR, char, @"%c");
-        HANDLE(_C_UCHR, unsigned char, @"%u");
-        HANDLE(_C_BOOL, _Bool, @"%d");
-        HANDLE(_C_SHT, short, @"%d");
-        HANDLE(_C_USHT, unsigned short, @"%u");
-        HANDLE(_C_INT, int, @"%d");
-        HANDLE(_C_UINT, unsigned int, @"%u");
-        HANDLE(_C_LNG, long, @"%ld");
-        HANDLE(_C_ULNG, unsigned long, @"%lu");
-        HANDLE(_C_LNG_LNG, long long, @"%lld");
-        HANDLE(_C_ULNG_LNG, unsigned long long, @"%llu");
-        HANDLE(_C_FLT, float, @"%f");
-        HANDLE(_C_DBL, double, @"%f");
-        HANDLE(_C_CHARPTR, const char *, @"%s");
-        HANDLE(_C_ID, id, @"%p");
-        HANDLE(_C_PTR, void *, @"%p");
+        HANDLE(_C_CHR, char, CFSTR("%c"));
+        HANDLE(_C_UCHR, unsigned char, CFSTR("%u"));
+        HANDLE(_C_BOOL, _Bool, CFSTR("%d"));
+        HANDLE(_C_SHT, short, CFSTR("%d"));
+        HANDLE(_C_USHT, unsigned short, CFSTR("%u"));
+        HANDLE(_C_INT, int, CFSTR("%d"));
+        HANDLE(_C_UINT, unsigned int, CFSTR("%u"));
+        HANDLE(_C_LNG, long, CFSTR("%ld"));
+        HANDLE(_C_ULNG, unsigned long, CFSTR("%lu"));
+        HANDLE(_C_LNG_LNG, long long, CFSTR("%lld"));
+        HANDLE(_C_ULNG_LNG, unsigned long long, CFSTR("%llu"));
+        HANDLE(_C_FLT, float, CFSTR("%f"));
+        HANDLE(_C_DBL, double, CFSTR("%f"));
+        HANDLE(_C_CHARPTR, const char *, CFSTR("%s"));
+        HANDLE(_C_ID, id, CFSTR("%p"));
+        HANDLE(_C_PTR, void *, CFSTR("%p"));
 
 #undef HANDLE
 
@@ -487,7 +487,7 @@ static BOOL isBlock(id object)
     }
 
     CFAutorelease(description);
-    return description;
+    return (NSString*)description;
 }
 
 @end

@@ -40,12 +40,13 @@ struct NSProxyBlockFull {
 
 id __NSMakeSpecialForwardingCaptureBlock(const char* signature, void (^proxyBlock)(NSBlockInvocation*)) {
 	// dummy block we can use to borrow certain details we need for our custom block
+	// See https://clang.llvm.org/docs/Block-ABI-Apple.html for a better understanding
 	void (^dummyBlock)(void) = ^{
 		[proxyBlock self];
 	};
 	size_t signatureLength = strlen(signature);
 	struct Block_layout* dummy = (void*)dummyBlock;
-	struct Block_descriptor_full* dummyDescs = dummy->descriptor;
+	struct Block_descriptor_full* dummyDescs = (struct Block_descriptor_full*)dummy->descriptor;
 	struct NSProxyBlockFull* custom = calloc(sizeof(struct NSProxyBlockFull) + signatureLength + 1, 1);
 
 	custom->block.blockInternal.isa = _NSConcreteMallocBlock;
@@ -57,9 +58,11 @@ id __NSMakeSpecialForwardingCaptureBlock(const char* signature, void (^proxyBloc
 
 	custom->descs.desc1.size = sizeof(struct NSProxyBlock);
 
+	// TODO: Should we check for BLOCK_HAS_COPY_DISPOSE flag in dummyDescs?
 	custom->descs.desc2.copy = dummyDescs->desc2.copy;
 	custom->descs.desc2.dispose = dummyDescs->desc2.dispose;
 
+	// TODO: Should we check for BLOCK_HAS_SIGNATURE flag in dummyDescs?
 	custom->descs.desc3.signature = custom->signature;
 	custom->descs.desc3.layout = dummyDescs->desc3.layout;
 
@@ -67,5 +70,5 @@ id __NSMakeSpecialForwardingCaptureBlock(const char* signature, void (^proxyBloc
 
 	custom->descs.desc2.copy(custom, dummy);
 
-	return custom;
+	return (id)custom;
 };
