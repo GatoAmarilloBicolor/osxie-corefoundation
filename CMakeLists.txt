@@ -1,6 +1,6 @@
 project(corefoundation)
 
-include(darling_framework)
+include(osxie_framework)
 
 remove_sdk_framework(CoreFoundation)
 
@@ -206,6 +206,6 @@ endif (TARGET_x86_64)
 
 set_source_files_properties(${cf_c_sources} PROPERTIES COMPILE_FLAGS "-x objective-c")
 
-add_darling_executable(plconvert plconvert.c)
+add_osxie_executable(plconvert plconvert.c)
 target_link_libraries(plconvert CoreFoundation)
-install(TARGETS plconvert DESTINATION libexec/darling/usr/bin)
+install(TARGETS plconvert DESTINATION libexec/osxie/usr/bin)
