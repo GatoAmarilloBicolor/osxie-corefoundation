@@ -573,7 +573,7 @@ extern uintptr_t __CFRuntimeObjCClassTable[];
 
 extern void _CFRuntimeSetInstanceTypeIDAndIsa(CFTypeRef cf, CFTypeID newTypeID);
 
-#ifdef DARLING
+#if defined(DARLING) || defined(OSXIE)
 
 #define CF_OBJC_FUNCDISPATCHV(typeID, ret, obj, ...) \
 _Pragma("clang diagnostic push") \
