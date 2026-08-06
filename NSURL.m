@@ -17,7 +17,12 @@
 #import <objc/runtime.h>
 #include <sys/statvfs.h>
 #include <sys/stat.h>
+#include <sys/xattr.h>
 #include <dlfcn.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 
 #define STACK_BUFFER_SIZE 100 // pretty safe bet this will be quite unlikely to use more than this since there are only 94 properties
 
@@ -540,6 +545,83 @@ static CFTypeRef CFURLCreatePropertyForKey(CFURLRef url, CFStringRef key, CFErro
             }
         }
     }
+    else if (CFEqual(key, kCFURLQuarantinePropertiesKey))
+    {
+        UInt8 path[PATH_MAX] = { 0 };
+
+        if (CFURLGetFileSystemRepresentation(url, true, path, PATH_MAX))
+        {
+            char buf[8192];
+            ssize_t len = getxattr((const char *)path, "com.apple.quarantine", buf, sizeof(buf) - 1, 0, 0);
+            if (len > 0)
+            {
+                buf[len] = '\0';
+
+                // Parse "flags;epoch;agent;data-url;origin-url" back into an LSQuarantine-style dictionary.
+                const void *keys[4] = {
+                    CFSTR("LSQuarantineAgentName"),
+                    CFSTR("LSQuarantineDataURL"),
+                    CFSTR("LSQuarantineOriginURL"),
+                    CFSTR("LSQuarantineTimeStamp"),
+                };
+                CFTypeRef vals[4] = { NULL, NULL, NULL, NULL };
+
+                char *fields[5] = { NULL, NULL, NULL, NULL, NULL };
+                char *saveptr = NULL;
+                char *tok = strtok_r(buf, ";", &saveptr);
+                int idx = 0;
+                while (tok != NULL && idx < 5)
+                {
+                    fields[idx] = tok;
+                    idx++;
+                    tok = strtok_r(NULL, ";", &saveptr);
+                }
+
+                // fields[0]=flags, fields[1]=epoch, fields[2]=agent, fields[3]=data-url
+                if (fields[2] != NULL && fields[2][0] != '\0')
+                    vals[0] = CFStringCreateWithCString(kCFAllocatorDefault, fields[2], kCFStringEncodingUTF8);
+                if (fields[3] != NULL && fields[3][0] != '\0')
+                    vals[1] = CFStringCreateWithCString(kCFAllocatorDefault, fields[3], kCFStringEncodingUTF8);
+                if (fields[4] != NULL && fields[4][0] != '\0')
+                    vals[2] = CFStringCreateWithCString(kCFAllocatorDefault, fields[4], kCFStringEncodingUTF8);
+                if (fields[1] != NULL && fields[1][0] != '\0')
+                {
+                    char *endptr = NULL;
+                    unsigned long long epoch = strtoull(fields[1], &endptr, 16);
+                    if (endptr != fields[1])
+                    {
+                        CFNumberRef num = CFNumberCreate(kCFAllocatorDefault, kCFNumberLongLongType, &epoch);
+                        if (num != NULL)
+                        {
+                            vals[3] = num;
+                        }
+                    }
+                }
+
+                CFDictionaryRef props = CFDictionaryCreate(kCFAllocatorDefault, keys, (const void **)vals, 4, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+                if (props != NULL)
+                {
+                    value = props;
+                }
+
+                for (int i = 0; i < 4; i++)
+                {
+                    if (vals[i] != NULL)
+                    {
+                        CFRelease(vals[i]);
+                    }
+                }
+            }
+            else if (len == -1)
+            {
+                posixError(error);
+            }
+        }
+        else
+        {
+            posixError(error);
+        }
+    }
 
     return value;
 }
@@ -895,6 +977,49 @@ static CFTypeRef CFURLSetPropertyForKey(CFURLRef url, CFStringRef key, CFTypeRef
     else if (CFEqual(key, kCFURLFileResourceTypeKey))
     {
         // not supported
+    }
+    else if (CFEqual(key, kCFURLQuarantinePropertiesKey) && CFGetTypeID(value) == CFDictionaryGetTypeID())
+    {
+        UInt8 path[PATH_MAX] = { 0 };
+        if (CFURLGetFileSystemRepresentation(url, true, path, PATH_MAX))
+        {
+            CFDictionaryRef quarantineProps = (CFDictionaryRef)value;
+            CFStringRef agent = CFDictionaryGetValue(quarantineProps, CFSTR("LSQuarantineAgentName"));
+            CFStringRef dataURL = CFDictionaryGetValue(quarantineProps, CFSTR("LSQuarantineDataURL"));
+            CFStringRef originURL = CFDictionaryGetValue(quarantineProps, CFSTR("LSQuarantineOriginURL"));
+
+            char agentBuf[256] = { 0 };
+            char dataBuf[4096] = { 0 };
+            char originBuf[4096] = { 0 };
+
+            if (agent != NULL && CFGetTypeID(agent) == CFStringGetTypeID())
+                CFStringGetCString(agent, agentBuf, sizeof(agentBuf), kCFStringEncodingUTF8);
+            if (dataURL != NULL && CFGetTypeID(dataURL) == CFStringGetTypeID())
+                CFStringGetCString(dataURL, dataBuf, sizeof(dataBuf), kCFStringEncodingUTF8);
+            if (originURL != NULL && CFGetTypeID(originURL) == CFStringGetTypeID())
+                CFStringGetCString(originURL, originBuf, sizeof(originBuf), kCFStringEncodingUTF8);
+
+            // Serialize as a standard com.apple.quarantine value:
+            // flags;epoch;agent;data-url;origin-url (0x0081 = translocate, not user-approved)
+            char quarantineValue[8192];
+            int len = snprintf(quarantineValue, sizeof(quarantineValue), "%04x;%llx;%s;%s;%s",
+                               0x0081, (unsigned long long)time(NULL),
+                               agentBuf, dataBuf, originBuf);
+
+            if (len > 0 && (size_t)len < sizeof(quarantineValue))
+            {
+                setxattr((const char *)path, "com.apple.quarantine", quarantineValue, (size_t)len, 0, 0);
+                acceptedValue = CFRetain(value);
+            }
+            else
+            {
+                posixError(error);
+            }
+        }
+        else
+        {
+            posixError(error);
+        }
     }
 
     return acceptedValue;

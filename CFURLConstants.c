@@ -156,6 +156,7 @@ const CFStringRef _kCFURLVolumeIsInternalKey = CFSTR("_NSURLVolumeIsInternalKey"
 const CFStringRef _kCFURLVolumeIsLocalKey = CFSTR("NSURLVolumeIsLocalKey");
 const CFStringRef _kCFURLVolumeIsLocaliDiskMirrorKey = CFSTR("_NSURLVolumeIsLocaliDiskMirrorKey");
 const CFStringRef _kCFURLVolumeIsQuarantinedKey = CFSTR("_NSURLVolumeIsQuarantinedKey");
+const CFStringRef kCFURLQuarantinePropertiesKey = CFSTR("NSURLQuarantinePropertiesKey");
 const CFStringRef _kCFURLVolumeIsReadOnlyKey = CFSTR("NSURLVolumeIsReadOnlyKey");
 const CFStringRef _kCFURLVolumeIsRemovableKey = CFSTR("NSURLVolumeIsRemovableKey");
 const CFStringRef _kCFURLVolumeIsiDiskKey = CFSTR("_NSURLVolumeIsiDiskKey");
