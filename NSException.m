@@ -14,6 +14,9 @@
 #import <dispatch/dispatch.h>
 #import <objc/runtime.h>
 #import <execinfo.h>
+#import <fcntl.h>
+#import <unistd.h>
+#import <stdio.h>
 
 @interface NSException ()
 - (BOOL)_installStackTraceKeyIfNeeded;
@@ -24,12 +27,34 @@ extern objc_exception_preprocessor objc_setExceptionPreprocessor(objc_exception_
 
 static NSException *__exceptionPreprocess(NSException *exception)
 {
+    {
+        int fd = open("/tmp/opencode/pp_marker.log", O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (fd >= 0)
+        {
+            write(fd, "preprocessor\n", 13);
+            close(fd);
+        }
+    }
     // this is quite expensive (1/3 sec lag), when it can be made more performant (under 1/60 sec) this should be re-enabled
     // UPDATE(facekapow): i've re-enabled this even though nothing has really changed in the code, but from limited testing
     //                    it seems that this is pretty performant. besides, exceptions are just that: *exceptions*.
     //                    you shouldn't be constantly throwing around exceptions.
 #if 1
     [exception _installStackTraceKeyIfNeeded];
+    if ([exception.reason rangeOfString: @"beyond array bounds"].location != NSNotFound)
+    {
+        void *stack[128];
+        int count = backtrace(stack, 128);
+        int fd = open("/tmp/opencode/cf_bt.log", O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (fd >= 0)
+        {
+            char hdr[96];
+            snprintf(hdr, sizeof(hdr), "=== exception %s pid %d ===\n", [exception.reason UTF8String], (int)getpid());
+            write(fd, hdr, strlen(hdr));
+            backtrace_symbols_fd(stack, count, fd);
+            close(fd);
+        }
+    }
 #endif
     return exception;
 }

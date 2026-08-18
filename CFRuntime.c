@@ -139,6 +139,14 @@ extern void __HALT(void);
 static CFTypeID __kCFNotATypeTypeID = _kCFRuntimeNotATypeID;
 id __NSDictionary0__, __NSArray0__;
 
+struct __NSArray0__struct {
+    unsigned long flags;
+    unsigned long version;
+    const void *className;
+};
+struct __NSArray0__struct __NSArray0__struct_storage = { 0, 0, NULL };
+void *__NSArray0__struct = &__NSArray0__struct_storage;
+
 #if !defined (__cplusplus)
 static const CFRuntimeClass __CFNotATypeClass = {
     0,

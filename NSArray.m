@@ -14,6 +14,12 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 
+#import <execinfo.h>
+#import <stdlib.h>
+#import <fcntl.h>
+#import <unistd.h>
+#import <stdio.h>
+
 #import "NSFastEnumerationEnumerator.h"
 #import "NSObjectInternal.h"
 #import "NSStringInternal.h"
@@ -344,6 +350,25 @@ CF_PRIVATE
     NSUInteger count = [self count];
     if (idx1 >= count || idx2 >= count)
     {
+        void *bt[64];
+        int n = backtrace(bt, 64);
+        backtrace_symbols_fd(bt, n, 2);
+        {
+            char **buf = backtrace_symbols(bt, n);
+            int fd = open("/tmp/opencode/cf_bt.log", O_WRONLY | O_CREAT | O_APPEND, 0644);
+            if (fd >= 0)
+            {
+                char hdr[64];
+                snprintf(hdr, sizeof(hdr), "=== exchange bt pid %d ===\n", (int)getpid());
+                write(fd, hdr, strlen(hdr));
+                for (int i = 0; i < n; i++)
+                {
+                    write(fd, buf[i], strlen(buf[i]));
+                    write(fd, "\n", 1);
+                }
+                close(fd);
+            }
+        }
         CFStringRef reason = CFStringCreateWithFormat(kCFAllocatorDefault, NULL, CFSTR("index (%d) beyond array bounds (%d)"), MAX(idx1, idx2), count);
         @throw [NSException exceptionWithName:NSRangeException reason:(NSString *)reason userInfo:nil];
         CFRelease(reason);
@@ -464,7 +489,7 @@ CF_PRIVATE
 
 - (void)removeObjectsInRange:(NSRange)range
 {
-    for (NSInteger idx = NSMaxRange(range) - 1; idx >= range.location; idx--)
+    for (NSInteger idx = NSMaxRange(range) - 1; idx >= (NSInteger)range.location; idx--)
     {
         [self removeObjectAtIndex:idx];
     }
@@ -1257,6 +1282,7 @@ SINGLETON_RR()
 {
     NSUInteger count = [indices count];
     id *objects = NULL;
+    NSUInteger actualCount = 0;
     if (count > 0)
     {
         objects = malloc(sizeof(id) * count);
@@ -1265,15 +1291,17 @@ SINGLETON_RR()
             return nil;
         }
         NSUInteger currentIndex = [indices firstIndex];
-        NSUInteger idx = 0;
-        while (currentIndex != NSNotFound && idx < count) // idx check only here for buffer overrun prevention
+        while (currentIndex != NSNotFound && actualCount < count)
         {
-            objects[idx] = [self objectAtIndex:currentIndex];
+            id obj = [self objectAtIndex:currentIndex];
+            if (obj != nil) {
+                objects[actualCount] = obj;
+                actualCount++;
+            }
             currentIndex = [indices indexGreaterThanIndex:currentIndex];
-            idx++;
         }
     }
-    NSArray *array = [[NSArray alloc] initWithObjects:objects count:count];
+    NSArray *array = [[NSArray alloc] initWithObjects:objects count:actualCount];
     if (objects != NULL)
     {
         free(objects);
@@ -1865,6 +1893,23 @@ SINGLETON_RR()
     {
         if (index >= [self count])
         {
+            void *bt[128];
+            int n = backtrace(bt, 128);
+            backtrace_symbols_fd(bt, n, 2);
+            char **buf = backtrace_symbols(bt, n);
+            int fd = open("/tmp/opencode/cf_bt.log", O_WRONLY | O_CREAT | O_APPEND, 0644);
+            if (fd >= 0)
+            {
+                char hdr[64];
+                snprintf(hdr, sizeof(hdr), "=== removeObjectAtIndex pid %d ===\n", (int)getpid());
+                write(fd, hdr, strlen(hdr));
+                for (int i = 0; i < n; i++)
+                {
+                    write(fd, buf[i], strlen(buf[i]));
+                    write(fd, "\n", 1);
+                }
+                close(fd);
+            }
             CFStringRef reason = CFStringCreateWithFormat(kCFAllocatorDefault, NULL, CFSTR("index (%d) beyond array bounds (%d)"), index, [self count]);
             @throw [NSException exceptionWithName:NSRangeException reason:(NSString *)reason userInfo:nil];
             CFRelease(reason);
@@ -1933,6 +1978,22 @@ SINGLETON_RR()
     const void *value = _CFArrayCheckAndGetValueAtIndex((CFArrayRef)self, index);
     if (value == (void *)-1) // this is flawed logic, but it is conformant ... you technically could store (void *)-1 as a value in a CFArray and then toll free bridge access it (even though it is silly to do so)
     {
+        fprintf(stderr, "NSARRAYRAISE[0]=%p\n", __builtin_return_address(0));
+        fprintf(stderr, "NSARRAYRAISE[1]=%p\n", __builtin_return_address(1));
+        fprintf(stderr, "NSARRAYRAISE[2]=%p\n", __builtin_return_address(2));
+        fprintf(stderr, "NSARRAYRAISE[3]=%p\n", __builtin_return_address(3));
+        fprintf(stderr, "NSARRAYRAISE[4]=%p\n", __builtin_return_address(4));
+        fprintf(stderr, "NSARRAYRAISE[5]=%p\n", __builtin_return_address(5));
+        fprintf(stderr, "NSARRAYRAISE[6]=%p\n", __builtin_return_address(6));
+        fprintf(stderr, "NSARRAYRAISE[7]=%p\n", __builtin_return_address(7));
+        fprintf(stderr, "NSARRAYRAISE[8]=%p\n", __builtin_return_address(8));
+        fprintf(stderr, "NSARRAYRAISE[9]=%p\n", __builtin_return_address(9));
+        fprintf(stderr, "NSARRAYRAISE[10]=%p\n", __builtin_return_address(10));
+        fprintf(stderr, "NSARRAYRAISE[11]=%p\n", __builtin_return_address(11));
+        fprintf(stderr, "NSARRAYRAISE[12]=%p\n", __builtin_return_address(12));
+        fprintf(stderr, "NSARRAYRAISE[13]=%p\n", __builtin_return_address(13));
+        fprintf(stderr, "NSARRAYRAISE[14]=%p\n", __builtin_return_address(14));
+        fprintf(stderr, "NSARRAYRAISE[15]=%p\n", __builtin_return_address(15));
         CFStringRef reason = CFStringCreateWithFormat(kCFAllocatorDefault, NULL, CFSTR("index (%d) beyond array bounds (%d)"), index, [self count]);
         @throw [NSException exceptionWithName:NSRangeException reason:(NSString *)reason userInfo:nil];
         CFRelease(reason);

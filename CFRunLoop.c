@@ -2482,6 +2482,10 @@ static int32_t __CFRunLoopRun(CFRunLoopRef rl, CFRunLoopModeRef rlm, CFTimeInter
         }
         msg = (mach_msg_header_t *)msg_buffer;
         __CFRunLoopServiceMachPort(waitSet, &msg, sizeof(msg_buffer), &livePort, poll ? 0 : TIMEOUT_INFINITY, &voucherState, &voucherCopy);
+        if (getenv("OSXIE_TRACE_RUNLOOP")) {
+            fprintf(stderr, "[RL] woke from wait rl=%p livePort=0x%x wakeUpPort=0x%x\n", rl, (unsigned)livePort, (unsigned)rl->_wakeUpPort);
+            fflush(stderr);
+        }
 #endif
         
         
@@ -2719,10 +2723,6 @@ void CFRunLoopWakeUp(CFRunLoopRef rl) {
     CHECK_FOR_FORK();
     // This lock is crucial to ignorable wakeups, do not remove it.
     __CFRunLoopLock(rl);
-    if (__CFRunLoopIsIgnoringWakeUps(rl)) {
-        __CFRunLoopUnlock(rl);
-        return;
-    }
 #if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED || DEPLOYMENT_TARGET_EMBEDDED_MINI
     kern_return_t ret;
     /* We unconditionally try to send the message, since we don't want
@@ -2730,6 +2730,12 @@ void CFRunLoopWakeUp(CFRunLoopRef rl) {
      * wakeup pending, since the queue length is 1. */
     ret = __CFSendTrivialMachMessage(rl->_wakeUpPort, 0, MACH_SEND_TIMEOUT, 0);
     if (ret != MACH_MSG_SUCCESS && ret != MACH_SEND_TIMED_OUT) CRASH("*** Unable to send message to wake up port. (%d) ***", ret);
+    if (getenv("OSXIE_TRACE_RUNLOOP")) {
+        CFIndex len = 0;
+        const char *name = (rl->_currentMode && rl->_currentMode->_name) ? CFStringGetCStringPtr(rl->_currentMode->_name, kCFStringEncodingASCII) : NULL;
+        fprintf(stderr, "[RL] CFRunLoopWakeUp rl=%p wakeUpPort=0x%x ret=%d currentMode=%s sleeping=%d ignoring=%d\n", rl, (unsigned)rl->_wakeUpPort, (int)ret, name ? name : "(none)", __CFRunLoopIsSleeping(rl) ? 1 : 0, __CFRunLoopIsIgnoringWakeUps(rl) ? 1 : 0);
+        fflush(stderr);
+    }
 #elif DEPLOYMENT_TARGET_WINDOWS
     SetEvent(rl->_wakeUpPort);
 #endif

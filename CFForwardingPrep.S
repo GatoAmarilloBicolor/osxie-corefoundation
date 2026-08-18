@@ -207,7 +207,6 @@ __CF_forwarding_prep_b:
 .align 4, 0x90
 
 __CF_forwarding_prep_0:
-__CF_forwarding_prep_1:
     .cfi_startproc
     .cfi_personality 155, ___objc_personality_v0
     push %rbp
@@ -236,10 +235,11 @@ __CF_forwarding_prep_1:
 
     movq   %rsp, %rdi
     leaq   0xc0(%rsp), %rsi
+    xorq   %rdx, %rdx          // non-stret
     call   ____forwarding___ // call through
 
     cmpq   $0, %rax          // check for forwarding completion
-    jne    Lfail
+    jne    Lfail0
 
     // if it's nil, we're done
     // now, load the return value from the on-stack storage
@@ -256,7 +256,7 @@ __CF_forwarding_prep_1:
     // .cfi_def_cfa rsp, 8
     ret
 
-Lfail:
+Lfail0:
     // if we got a non-nil value, it's our forwarding target
     movq   %rax, %rdi
     movq   0x80(%rsp), %rax
@@ -280,6 +280,68 @@ Lfail:
     // .cfi_def_cfa rsp, 8
 
     jmp    _objc_msgSend // restart message send
+
+    .cfi_endproc
+
+// objc_msgSend_stret ABI: rdi = return-storage pointer, rsi = self,
+// rdx = _cmd, rcx/r8/r9 = args, xmm0-7 = FP args. The marg_list therefore
+// keeps the return-storage pointer in slot 0 (matching the NSMethodSignature
+// offsets of a stret method, where self lives at offset 8), self in slot 1,
+// _cmd in slot 2, and so on.
+__CF_forwarding_prep_1:
+    .cfi_startproc
+    .cfi_personality 155, ___objc_personality_v0
+    push %rbp
+    .cfi_def_cfa_offset 16
+    .cfi_offset %rbp, -16
+    movq %rsp, %rbp
+    .cfi_def_cfa_register rbp
+
+    // Copy args from regs into a stack var
+    subq   $0xd0, %rsp
+    movq   %rax, 0xb0(%rsp)
+    movapd %xmm7, 0xa0(%rsp)
+    movapd %xmm6, 0x90(%rsp)
+    movapd %xmm5, 0x80(%rsp)
+    movapd %xmm4, 0x70(%rsp)
+    movapd %xmm3, 0x60(%rsp)
+    movapd %xmm2, 0x50(%rsp)
+    movapd %xmm1, 0x40(%rsp)
+    movapd %xmm0, 0x30(%rsp)
+    movq   %r9, 0x28(%rsp)
+    movq   %r8, 0x20(%rsp)
+    movq   %rcx, 0x18(%rsp)
+    movq   %rdx, 0x10(%rsp)
+    movq   %rsi, 8(%rsp)
+    movq   %rdi, (%rsp)
+
+    movq   %rsp, %rdi
+    movq   (%rsp), %rsi         // return-storage pointer from slot 0
+    movq   $1, %rdx             // stret
+    call   ____forwarding___ // call through
+
+    cmpq   $0, %rax          // check for forwarding completion
+    jne    Lfail1
+
+    // if it's nil, we're done; the return value was written directly into the
+    // caller's return-storage buffer, so nothing needs reloading.
+    movq   %rbp, %rsp
+    pop    %rbp
+    // .cfi_def_cfa rsp, 8
+    ret
+
+Lfail1:
+    // if we got a non-nil value, it's our forwarding target; restart the
+    // message send with it. rcx/r8/r9 and xmm0-7 were never modified, so
+    // only the first three GP registers need restoring.
+    movq   (%rsp), %rdi         // return-storage pointer
+    movq   %rax, %rsi           // forwarding target -> self
+    movq   0x10(%rsp), %rdx     // _cmd
+    movq   %rbp, %rsp
+    pop    %rbp
+    // .cfi_def_cfa rsp, 8
+
+    jmp    _objc_msgSend_stret // restart message send
 
     .cfi_endproc
 

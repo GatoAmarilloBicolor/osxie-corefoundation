@@ -1004,10 +1004,14 @@ GSObjCAddClassOverride(Class receiver, Class override)
  * to get a value.
  */
 id
-GSObjCGetVal(NSObject *self, const char *key, SEL sel,
-	       const char *type, unsigned size, int offset)
-{
-  NSMethodSignature	*sig = nil;
+ GSObjCGetVal(NSObject *self, const char *key, SEL sel,
+ 	       const char *type, unsigned size, int offset)
+ {
+   NSMethodSignature	*sig = nil;
+
+   fprintf(stderr, "[TRACE GSObjCGetVal] key=%s self=%p sel=%p type=%s\n",
+           key ? key : "(null)", self, sel, type ? type : "(null)");
+
 
   if (sel != 0)
     {

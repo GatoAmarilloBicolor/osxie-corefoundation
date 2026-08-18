@@ -48,10 +48,12 @@ struct objc_sendv_margs {
     uintptr_t stackArgs[];
 };
 
-id ___forwarding___(struct objc_sendv_margs *args, void *returnStorage)
+id ___forwarding___(struct objc_sendv_margs *args, void *returnStorage, int stret)
 {
-    id self = (id)args->a[0];
-    SEL _cmd = (SEL)args->a[1];
+    // For a stret (struct-return) call the marg_list's first slot is occupied by
+    // the return-storage pointer (rdi), so self/_cmd are shifted by one slot.
+    id self = (id)args->a[stret ? 1 : 0];
+    SEL _cmd = (SEL)args->a[stret ? 2 : 1];
     Class class = object_getClass(self);
 
     const char *className = class_getName(class);

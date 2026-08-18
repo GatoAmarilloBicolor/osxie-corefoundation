@@ -124,6 +124,7 @@ set(cf_sources
 	NSCalendar.m
 	NSCFType.m
 	NSConstantString.m
+	NSConstantDictionary.m
 	NSData.m
 	NSDateComponents.m
 	NSDate.m

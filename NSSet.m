@@ -11,6 +11,8 @@
 #import "NSObjectInternal.h"
 #import "NSFastEnumerationEnumerator.h"
 
+#include <execinfo.h>
+
 CF_PRIVATE
 @interface __NSPlaceholderSet : NSMutableSet
 + (id)mutablePlaceholder;
@@ -278,6 +280,11 @@ SINGLETON_RR()
     for (int i = 0; i < cnt; i++) {
         id value = objects[i];
         if (value == nil) {
+            void *stack[64]; int n = backtrace(stack, 64);
+            char **sym = backtrace_symbols(stack, n);
+            fprintf(stderr, "NSSET-NIL objects[%d] cnt=%lu caller:\n", i, (unsigned long)cnt);
+            for (int bi = 0; bi < n; bi++) fprintf(stderr, "  %s\n", sym[bi]);
+            free(sym);
             [NSException raise:NSInvalidArgumentException
                         format:[(NSString *)CFStringCreateWithFormat(NULL,NULL,CFSTR("The object at objects[%d] is nil."),i) autorelease]];
         }
@@ -524,10 +531,17 @@ SINGLETON_RR()
 - (NSSet *)objectsWithOptions:(NSEnumerationOptions)opts passingTest:(BOOL (^)(id obj, BOOL *stop))predicate
 {
     NSArray *objects = [self allObjects];
-    NSIndexSet *indicies = [objects indexesOfObjectsPassingTest:^(id obj, NSUInteger idx, BOOL *stop){
-        return predicate(obj, stop);
-    }];
-    return [[[NSSet alloc] initWithArray:[objects objectsAtIndexes:indicies]] autorelease];
+    NSMutableSet *result = [NSMutableSet set];
+    BOOL stop = NO;
+    for (id obj in objects) {
+        if (obj != nil && predicate(obj, &stop)) {
+            [result addObject:obj];
+        }
+        if (stop) {
+            break;
+        }
+    }
+    return [[result copy] autorelease];
 }
 
 @end

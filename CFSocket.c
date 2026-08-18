@@ -1067,6 +1067,18 @@ static CFMutableDataRef __CFReadSocketsFds = NULL;
 static CFDataRef zeroLengthData = NULL;
 static Boolean __CFReadSocketsTimeoutInvalid = true;  /* rebuild the timeout value before calling select */
 
+#if !defined(DEPLOYMENT_TARGET_WINDOWS)
+#include <unistd.h>
+static int osxie_cf_tr = -1;
+static int osxie_cfsocket_trace_enabled(void) {
+    if (osxie_cf_tr < 0) osxie_cf_tr = (getenv("OSXIE_TRACE_CFSOCKET") != NULL) ? 1 : 0;
+    return osxie_cf_tr;
+}
+#define OSXIE_CF_TRACE(fmt, ...) do { if (osxie_cfsocket_trace_enabled()) { fprintf(stderr, "[CFSOCKET] " fmt "\n", ##__VA_ARGS__); fflush(stderr); } } while (0)
+#else
+#define OSXIE_CF_TRACE(fmt, ...) do { } while (0)
+#endif
+
 static CFSocketNativeHandle __CFWakeupSocketPair[2] = {INVALID_SOCKET, INVALID_SOCKET};
 static void *__CFSocketManagerThread = NULL;
 
@@ -1278,6 +1290,7 @@ static SInt32 __CFSocketCreateWakeupSocketPair(void) {
 // Changes to the master fs_sets occur via these 4 functions.
 CF_INLINE Boolean __CFSocketSetFDForRead(CFSocketRef s) {
     __CFReadSocketsTimeoutInvalid = true;
+    OSXIE_CF_TRACE("SetFDForRead sock=%d", s->_socket);
     Boolean b = __CFSocketFdSet(s->_socket, __CFReadSocketsFds);
     if (b && INVALID_SOCKET != __CFWakeupSocketPair[0]) {
         uint8_t c = 'r';
@@ -1732,6 +1745,7 @@ static void __CFSocketHandleRead(CFSocketRef s, Boolean causedByTimeout)
 #if defined(LOG_CFSOCKET)
     fprintf(stdout, "read signaling source for socket %d\n", s->_socket);
 #endif
+    OSXIE_CF_TRACE("HandleRead signal sock=%d", s->_socket);
     CFRunLoopSourceSignal(s->_source0);
     CFMutableArrayRef runLoopsOrig = (CFMutableArrayRef)CFRetain(s->_runLoops);
     CFMutableArrayRef runLoopsCopy = CFArrayCreateMutableCopy(kCFAllocatorSystemDefault, 0, s->_runLoops);
@@ -1744,6 +1758,7 @@ static void __CFSocketHandleRead(CFSocketRef s, Boolean causedByTimeout)
     CFRunLoopRef rl = __CFSocketCopyRunLoopToWakeUp(source0, runLoopsCopy);
     if (source0) CFRelease(source0);
     if (NULL != rl) {
+        OSXIE_CF_TRACE("HandleRead wakeup runloop sock=%d rl=%p", s->_socket, rl);
         CFRunLoopWakeUp(rl);
         CFRelease(rl);
     }
@@ -2153,6 +2168,13 @@ static void *__CFSocketManager(void * arg)
 #if defined(LOG_CFSOCKET)
         fprintf(stdout, "socket manager woke from select, ret=%ld\n", (long)nrfds);
 #endif
+        if (osxie_cfsocket_trace_enabled()) {
+            int _i;
+            fprintf(stderr, "[CFSOCKET] select ret=%ld maxnrfds=%ld readfds={", (long)nrfds, (long)maxnrfds);
+            for (_i = 0; _i < maxnrfds; _i++) if (FD_ISSET(_i, readfds)) fprintf(stderr, "%d,", _i);
+            fprintf(stderr, "} timeout=%s\n", pTimeout ? "set" : "infinite");
+            fflush(stderr);
+        }
 
 		/*
 		 * select returned a timeout
@@ -2256,6 +2278,7 @@ static void *__CFSocketManager(void * arg)
             }
 
             if (INVALID_SOCKET != sock && sockInBounds && (FD_ISSET(sock, readfds) || s->_hitTheTimeout)) {
+                if (osxie_cfsocket_trace_enabled()) fprintf(stderr, "[CFSOCKET] FD_CLR sock=%d idx=%ld readfds_bit=%d timeout_bit=%d\n", sock, (long)idx, FD_ISSET(sock, readfds) ? 1 : 0, s->_hitTheTimeout ? 1 : 0);
                 CFArraySetValueAtIndex(selectedReadSockets, selectedReadSocketsIndex, s);
                 selectedReadSocketsIndex++;
                 /* socket is removed from fds here, will be restored in read handling or in perform function */
@@ -2926,6 +2949,7 @@ static void __CFSocketPerformV0(void *info) {
 // CFLog(5, CFSTR("__CFSocketPerformV0(%p) starting"), s);
 
     __CFSocketLock(s);
+    OSXIE_CF_TRACE("PerformV0 enter sock=%d", s->_socket);
     if (!__CFSocketIsValid(s)) {
         __CFSocketUnlock(s);
         return;
@@ -2935,6 +2959,7 @@ static void __CFSocketPerformV0(void *info) {
     CFOptionFlags callBacksSignalled = 0;
     if (__CFSocketIsReadSignalled(s)) callBacksSignalled |= readCallBackType;
     if (__CFSocketIsWriteSignalled(s)) callBacksSignalled |= kCFSocketWriteCallBack;
+    OSXIE_CF_TRACE("PerformV0 readSignalled=%d callBacksSignalled=0x%x", (__CFSocketIsReadSignalled(s) ? 1 : 0), callBacksSignalled);
 
     if (kCFSocketDataCallBack == readCallBackType) {
         if (NULL != s->_dataQueue && 0 < CFArrayGetCount(s->_dataQueue)) {
@@ -2988,6 +3013,7 @@ static void __CFSocketPerformV0(void *info) {
         }
     }
     // Only reenable callbacks that are auto-reenabled
+    OSXIE_CF_TRACE("PerformV0 re-enable sock=%d types=0x%x scheduled=%d", s->_socket, callBacksSignalled & s->_f.client, __CFSocketIsScheduled(s) ? 1 : 0);
     __CFSocketEnableCallBacks(s, callBacksSignalled & s->_f.client, FALSE, 'p');  // unlocks s
 
     if (NULL != rl) {
