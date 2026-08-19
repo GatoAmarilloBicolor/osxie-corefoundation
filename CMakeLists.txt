@@ -177,6 +177,8 @@ add_separated_framework(CoreFoundation
 	CURRENT_VERSION
 	SOURCES
 		${cf_sources}
+	RESOURCES
+		Info.plist Info.plist
 	VERSION ${FRAMEWORK_VERSION}
 	DEPENDENCIES
 		objc
