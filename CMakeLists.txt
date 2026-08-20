@@ -125,6 +125,7 @@ set(cf_sources
 	NSCFType.m
 	NSConstantString.m
 	NSConstantArray.m
+	NSConstantDictionary.m
 	NSConstantDoubleNumber.m
 	NSData.m
 	NSDateComponents.m
